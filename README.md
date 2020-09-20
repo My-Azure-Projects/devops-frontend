@@ -1,4 +1,4 @@
-# devops-lecture-frontend
+# devops-frontend
 Frontend project with example Azure Pipelines CI, CircleCI, Github Actions CI, Gitlab CI 
 
 - Azure pipelines CI can be found in the root of the project under azure-pipelines.yml
