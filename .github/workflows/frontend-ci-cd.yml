@@ -1,0 +1,76 @@
+# Github Actions CI/CD pipleline that builds a react project on every commit
+# Commits to master branch deploy it to azure storage account 
+
+name: Frontend CI-CD
+# This workflow is triggered on pushes to the repository.
+on: [push]
+
+# For a simpler execution plan replace the trigger with the following section 
+# to trigger the pipeline only on commits to master branch
+
+# on:
+  # push:
+    # branches: [ master ]
+  # pull_request:
+    # branches: [ master ]
+    
+
+jobs:
+  build:
+    name: CI Pipeline
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [12.x]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Cache node modules
+      uses: actions/cache@v2
+      env:
+        cache-name: cache-node-modules
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run the tests
+      run: npm test -- --coverage
+    
+    - name: Lint
+      run: npm run lint
+
+    - name: Build
+      run: npm run build
+
+    - name: Share artifact inside workflow
+      uses: actions/upload-artifact@v1
+      with:
+        name: react-github-actions-build
+        path: build
+
+  deploy:
+      name: CD Pipeline 
+      needs: build
+      if: github.ref == 'refs/heads/master'
+      runs-on: ubuntu-latest
+      steps:
+
+        - name: Get artifact
+          uses: actions/download-artifact@v1
+          with:
+            name: react-github-actions-build
+
+        - name: Upload To Azure Blob Storage
+          uses: bacongobbler/azure-blob-storage-upload@v1.0.0
+          with:
+            source_dir: react-github-actions-build
+            container_name: $web
+            connection_string: ${{ secrets.CONNECTION_STRING }}

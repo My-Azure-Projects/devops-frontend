@@ -1,0 +1,93 @@
+# CircleCI pipleline that builds a react project on every commit
+# Commits to master branch deploy it to azure storage account 
+
+version: 2.1
+
+orbs:
+  azure-cli: circleci/azure-cli@1.0.0
+  
+jobs:
+  build-and-test:
+    docker:
+      - image: circleci/node:12.9.1-browsers
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+
+      - attach_workspace:
+          at: .
+
+      - restore_cache:
+          key: npm-cache-v1-{{ checksum "package-lock.json" }}
+      
+      - run:
+          name: Install Dependencies
+          command: npm ci
+
+      - save_cache:
+          key: npm-cache-v1-{{ checksum "package-lock.json" }}
+          paths:
+            - /home/circleci/.npm
+    
+      - run:
+          name: Test
+          command: npm test 
+
+      - run:
+          name: Lint
+          command: npm run lint
+
+      - run:
+          name: Build
+          command: npm run build
+      
+      - persist_to_workspace:
+          root: .
+          paths:
+            - build
+
+      - store_artifacts:
+          path: build
+          destination: artifact-file
+      
+
+  deploy-to-azure:
+    machine:
+      image: ubuntu-1604:201903-01 
+
+    steps:
+      - azure-cli/install
+
+      - checkout
+
+      - attach_workspace:
+          at: .
+
+      - run:
+          name: Verify Azure CLI is installed
+          command: az -v
+  
+
+      - run: 
+          name: Deploy to Azure Storage Account
+          command: az storage blob upload-batch -d "\$web" --source build --account-name $STORAGE_ACCOUNT_NAME --account-key $STORAGE_ACCOUNT_KEY
+
+workflows:
+    build-test-deploy:
+      jobs:
+        - build-and-test
+        # For a simpler execution plan uncomment the following section 
+        # to trigger the pipeline only on commits to master branch
+
+          # filters:
+              # branches:
+                # only: master
+        - deploy-to-azure:
+            requires:
+              - build-and-test
+            filters:
+              branches:
+                only:
+                  - master

@@ -1,0 +1,89 @@
+# Azure pipeline CI/CD that builds a react project on every commit
+# Commits to master branch deploy it to azure storage account 
+
+# For a simpler execution plan uncomment the following section 
+# to trigger the pipeline only on commits to master branch
+
+trigger:
+  batch: true
+  # branches:
+  #  - master
+
+stages:
+
+  - stage: Build
+    pool:
+      image: ubuntu-latest
+    jobs:
+      - job: Build
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: "12.5"
+            displayName: "Install Node.js"
+
+          - task: Cache@2
+            displayName: Cache npm packages
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json'
+              path: node_modules
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+                npm
+
+          - task: Npm@1
+            displayName: "npm ci"
+            inputs:
+              command: ci
+         
+          - script: |
+              npm run lint
+            displayName: "npm lint"
+
+          - script: |
+              npm test -- --coverage --ci --passWithNoTests
+            displayName: "npm test"
+            env:
+              CI: true #tests will only run once instead of launching the watcher
+          
+          - script: |
+              npm run build
+            displayName: "npm build"
+            env:
+              CI: true
+
+          - task: CopyFiles@2
+            displayName: "Copy Files"
+            inputs:
+              SourceFolder: "build"
+              TargetFolder: "$(Build.ArtifactStagingDirectory)"
+              CleanTargetFolder: true
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: "$(Build.ArtifactStagingDirectory)"
+              ArtifactName: "build"
+
+  - stage: Deploy
+    dependsOn: build
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'master'))
+    jobs:
+    - deployment: Deploy
+      pool:
+        vmImage: windows-latest
+      environment: "Develop"
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - download: current
+                artifact: build
+
+              - task: AzureFileCopy@3
+                inputs:
+                  displayName: 'Copy files to Storage Account Blob'
+                  sourcePath: $(Pipeline.Workspace)/build 
+                  azureSubscription: ShowCaseServiceConnection
+                  destination: AzureBlob
+                  storage: blobrubdevopsshowcase
+                  containerName: $web  
