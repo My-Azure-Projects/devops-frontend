@@ -1,6 +1,7 @@
 # Github Actions CI/CD pipleline that builds a react project on every commit
 # Commits to master branch deploy it to azure storage account 
 
+
 name: Frontend CI-CD
 # This workflow is triggered on pushes to the repository.
 on: [push]
