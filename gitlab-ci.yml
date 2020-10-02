@@ -1,6 +1,7 @@
 # Gitlab CI pipleline that builds a react project on every commit
 # Commits to master branch deploy it to azure storage account 
 
+
 stages:
   - build-and-test
   - deploy
