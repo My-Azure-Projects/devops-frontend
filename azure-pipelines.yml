@@ -4,6 +4,7 @@
 # For a simpler execution plan uncomment the following section 
 # to trigger the pipeline only on commits to master branch
 
+
 trigger:
   batch: true
   # branches:
